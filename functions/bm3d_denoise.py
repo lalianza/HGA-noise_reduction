@@ -1,41 +1,47 @@
-import numpy as np
 import cv2
-from skimage import img_as_float
+import numpy as np
+import bm3d 
 from skimage.metrics import peak_signal_noise_ratio as psnr
-from skimage.util import random_noise
-import bm3d
 from sklearn.model_selection import KFold
 
-def denoise_and_evaluate(image, sigma_psd):
-    denoised_image = (bm3d.bm3d(image, sigma_psd=sigma_psd) * 255).astype(np.uint8)
-    return denoised_image
+class BM3DDenoiser:
+    def __init__(self):
+        pass
 
-def cross_validate_sigma_psd(image, sigmas, n_splits=5):
-    best_sigma = None
-    best_psnr = -np.inf
-    kf = KFold(n_splits=n_splits)
-    
-    for sigma in sigmas:
-        psnr_scores = []
-        for train_index, val_index in kf.split(image):
-            train_image = image[train_index]
-            val_image = image[val_index]
-            denoised_image = denoise_and_evaluate(train_image, sigma)
-            denoised_image_resized = cv2.resize(denoised_image, (val_image.shape[1], val_image.shape[0]))
-            psnr_value = psnr(val_image, denoised_image_resized)
-            psnr_scores.append(psnr_value)
+    def denoise_and_evaluate(self, image, sigma_psd):
+        denoised_image = (bm3d.bm3d(image, sigma_psd=sigma_psd) * 255).astype(np.uint8)
+        return denoised_image
 
-        mean_psnr = np.mean(psnr_scores)
-    
-        if mean_psnr > best_psnr:
-            best_psnr = mean_psnr
-            best_sigma = sigma
-            
-    return best_sigma
+    def cross_validate_sigma_psd(self, image, sigmas, n_splits=5):
+        best_sigma = None
+        best_psnr = -np.inf
+        kf = KFold(n_splits=n_splits)
 
-sigmas = np.linspace(1/255, 200/255, 10) 
+        for sigma in sigmas:
+            psnr_scores = []
+            for train_index, val_index in kf.split(image):
+                train_image = image[train_index]
+                val_image = image[val_index]
+                denoised_image = self.denoise_and_evaluate(train_image, sigma)
+                denoised_image_resized = cv2.resize(denoised_image, (val_image.shape[1], val_image.shape[0]))
+                psnr_value = psnr(val_image, denoised_image_resized)
+                psnr_scores.append(psnr_value)
 
-def bm3d_denoise(image):
-    best_sigma = cross_validate_sigma_psd(image = image, sigmas = sigmas)
-    denoised_image = denoise_and_evaluate(image = image, sigma_psd = best_sigma)
-    return denoised_image    
+            mean_psnr = np.mean(psnr_scores)
+
+            if mean_psnr > best_psnr:
+                best_psnr = mean_psnr
+                best_sigma = sigma
+
+        return best_sigma
+
+    def bm3d_denoise(self, image, sigmas=None):
+        if sigmas is None:
+            sigmas = np.linspace(1/255, 200/255, 10)
+
+        best_sigma = self.cross_validate_sigma_psd(image, sigmas)
+        denoised_image = self.denoise_and_evaluate(image, best_sigma)
+        return denoised_image
+
+
+  
